@@ -5,18 +5,22 @@ from sklearn.linear_model import LinearRegression
 from collections import deque
 
 
-queue_size = 12
+queue_size = 2
 
 # Correlation coefficient required for zoom to be performed
-coeff_thresh = 0.8
+coeff_thresh = 0.93
 
 
 # Expressed in terms of hand lengths
-bs_total = 2
-bs_each = 0.75
+bs_total = 0.5
+bs_each = 0.2
 
 #tolerable missing data points
-missing_data_tolerance = 1
+missing_data_tolerance = 3
+
+#sensitivity coefficients
+zoom_sensitivity = 10
+
 
 
 
@@ -32,13 +36,14 @@ def euclid2Dimension(a, b):
     return math.sqrt((b[0] - a[0])**2 + (b[1] - a[1])**2)
 
 ## perform linear regression on set of points of hand
+## fixed length zoom window
 def zoom(my_queue):
     q = copy.deepcopy(my_queue)
     if(len(q) != q.maxlen):
         return None
     xs = list()
     ys = list()
-    last = [[-1, -1],[-1, -1]]
+    last = [[0, 0],[0, 0]]
     first = [[0, 0],[0, 0]]
     while(len(q) != 0):
         points = q.pop()
@@ -48,7 +53,7 @@ def zoom(my_queue):
         # Since the queue has the latest elements at the right side, 
         # the first item popped (with datapoints from both hands)
         # will be the final position of the hands for the possible zoom
-        if(len(points) == 2 and np.array_equal(last, [[-1, -1],[-1, -1]])):
+        if(len(points) == 2 and np.array_equal(last, [[0, 0],[0, 0]])):
             last = points
         for samp in points:
             xs.append([samp[0]])
@@ -68,6 +73,27 @@ def zoom(my_queue):
         print("zoom detected")
         print("correlation:" + str(line_fit.score(X, Y)))
         print("distance: " + str(dist1 + dist2))
-        return line_fit
+        print("first_L:" + str(first[0]) + "last_L" + str(last[0]))
+        print("first_R:" + str(first[1]) + "last_R" + str(last[1]))
+        if(euclid2Dimension(last[0], last[1]) > euclid2Dimension(first[0], first[1])):
+            return (dist1 + dist2)/zoom_sensitivity
+        else:
+            return -((dist1 + dist2)/zoom_sensitivity)
     else:
         return None
+## return linreg 
+def grabLinReg(my_queue):
+    xs = list()
+    ys = list()
+    q = copy.deepcopy(my_queue)
+    while(len(q) != 0):
+        points = q.pop()
+        for samp in points:
+            xs.append([samp[0]])
+            ys.append([samp[1]])
+    X = np.array(xs)
+    Y = np.array(ys)
+    line_fit = LinearRegression().fit(X, Y)
+    return line_fit.score(X, Y)
+ 
+    
