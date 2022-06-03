@@ -5,18 +5,18 @@ from sklearn.linear_model import LinearRegression
 from collections import deque
 
 
-queue_size = 2
+queue_size = 3
 
 # Correlation coefficient required for zoom to be performed
 coeff_thresh = 0.93
 
 
 # Expressed in terms of hand lengths
-bs_total = 0.5
-bs_each = 0.2
+bs_total = 0.7
+bs_each = 0.3
 
 #tolerable missing data points
-missing_data_tolerance = 3
+missing_data_tolerance = 1
 
 #sensitivity coefficients
 zoom_sensitivity = 10
@@ -70,11 +70,13 @@ def zoom(my_queue):
     Y = np.array(ys)
     line_fit = LinearRegression().fit(X, Y)
     if(line_fit.score(X, Y) >= coeff_thresh and (dist1 + dist2) > bs_total and dist1 > bs_each and dist2 > bs_each):
+        '''
         print("zoom detected")
         print("correlation:" + str(line_fit.score(X, Y)))
         print("distance: " + str(dist1 + dist2))
         print("first_L:" + str(first[0]) + "last_L" + str(last[0]))
         print("first_R:" + str(first[1]) + "last_R" + str(last[1]))
+        '''
         if(euclid2Dimension(last[0], last[1]) > euclid2Dimension(first[0], first[1])):
             return (dist1 + dist2)/zoom_sensitivity
         else:
