@@ -5,28 +5,40 @@ from sklearn.linear_model import LinearRegression
 from collections import deque
 
 
-queue_size = 3
+queue_size = 7
+
+#tolerable missing data points
+missing_data_tolerance = 1
+
+## ZOOM COEFFICIENTS
 
 # Correlation coefficient required for zoom to be performed
-coeff_thresh = 0.93
+coeff_thresh = 0.84
 
 
 # Expressed in terms of hand lengths
 bs_total = 0.7
 bs_each = 0.3
 
-#tolerable missing data points
-missing_data_tolerance = 1
-
 #sensitivity coefficients
-zoom_sensitivity = 10
+zoom_sensitivity = 8.6 # larger -> lower sensitivity
 
+
+### TRANSLATION COEFFICIENTS
+
+pair_thresh = 0.65
+
+min_dist_thresh = 1
+
+translation_sensitivity = 40 # larger -> higher sensitivity
+
+num_allowed_deviations = 2
 
 
 
 ## print queue
 def printQ(my_queue):
-    q = copy.deepcopy(q)
+    q = copy.deepcopy(my_queue)
     while len(q) > 0:
         print(q.pop())
 
@@ -83,6 +95,44 @@ def zoom(my_queue):
             return -((dist1 + dist2)/zoom_sensitivity)
     else:
         return None
+def translate(my_queue):
+    q = copy.deepcopy(my_queue)
+    if(len(q) != q.maxlen):
+        return None
+    first = q[0]
+    last = q[-1]
+    if(len(first) != 2 or len(last) != 2):
+        print("FLFail")
+        return None
+    starting_distance = euclid2Dimension(first[0], first[1])
+    print("Starting distance:" + str(starting_distance))
+    missing_data = 0
+    deviation_count = 0
+    printQ(q)
+    while(len(q) != 0):
+        data = q.popleft()
+        missing_data +=  2 - len(data)
+        if(len(data) != 2):
+            continue
+        d_dist = euclid2Dimension(data[0], data[1])
+        print("Data distance:" + str(d_dist))
+        if(((d_dist >= (starting_distance - pair_thresh)) and (d_dist <= (starting_distance + pair_thresh))) == False):
+            deviation_count += 1
+    if(deviation_count > num_allowed_deviations):
+        print("HMTFFail")
+        return None
+    if(missing_data > missing_data_tolerance):
+        print("MDTFail")
+        return None
+    avg_dist_moved = (euclid2Dimension(first[0], last[0]) + euclid2Dimension(first[1], last[1]))/2
+    print("Distance Moved" + str(avg_dist_moved))
+    if(avg_dist_moved < min_dist_thresh):
+        print("DNFEFail")
+        return None
+    x_t = (((last[0][0] - first[0][0]) + (last[1][0] - first[1][0]))/2) * translation_sensitivity
+    y_t = (((last[0][1] - first[0][1]) + (last[1][1] - first[1][1]))/2) * translation_sensitivity
+    return [-x_t, y_t]
+    
 ## return linreg 
 def grabLinReg(my_queue):
     xs = list()

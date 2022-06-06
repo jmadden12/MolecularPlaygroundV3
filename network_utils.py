@@ -16,8 +16,10 @@ def send_message(conn, type, style, arguments):
     body["type"] = type
     body["style"] = style
     if style == "zoom":
-        body['scale'] = arguments[0]
-    pass
+        body["scale"] = arguments[0]
+    if style == "translate":
+        body["x"] = arguments[0]
+        body["y"] = arguments[1]
     print(json.dumps(body))
     conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
 
