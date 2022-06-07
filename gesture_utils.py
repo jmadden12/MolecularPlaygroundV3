@@ -1,11 +1,14 @@
 import copy
 import math
+from statistics import variance
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from collections import deque
 
 
-queue_size = 7
+queue_size_translate = 7
+
+queue_size_zoom = 4
 
 #tolerable missing data points
 missing_data_tolerance = 1
@@ -13,12 +16,12 @@ missing_data_tolerance = 1
 ## ZOOM COEFFICIENTS
 
 # Correlation coefficient required for zoom to be performed
-coeff_thresh = 0.84
+coeff_thresh = 0.87
 
 
 # Expressed in terms of hand lengths
-bs_total = 0.7
-bs_each = 0.3
+bs_total = 1
+bs_each = 0.5
 
 #sensitivity coefficients
 zoom_sensitivity = 8.6 # larger -> lower sensitivity
@@ -28,9 +31,11 @@ zoom_sensitivity = 8.6 # larger -> lower sensitivity
 
 pair_thresh = 0.65
 
-min_dist_thresh = 1
+min_dist_thresh_x = 1
 
-translation_sensitivity = 40 # larger -> higher sensitivity
+min_dist_thresh_y = 0.37
+
+translation_sensitivity = 25 # larger -> higher sensitivity
 
 num_allowed_deviations = 2
 
@@ -41,6 +46,34 @@ def printQ(my_queue):
     q = copy.deepcopy(my_queue)
     while len(q) > 0:
         print(q.pop())
+
+def printQDesmos(my_queue):
+    q = copy.deepcopy(my_queue)
+    while len(q) > 0:
+        samp = q.popleft()
+        for x in samp:
+            print("(" + str(x[0]) + ", " + str(x[1]) + ")")
+
+def boundingBoxVariance(my_queue):
+    toConvertNd = list()
+    q = copy.deepcopy(my_queue)
+    count = 0
+    sum = 0
+    while len(q) > 0:
+        samp = q.popleft()
+        for x in samp:
+            toConvertNd.append(x)
+            sum += x
+            count += 1
+    if(len(toConvertNd) == 0):
+        return None
+    average = sum/count
+    if(average == 0):
+        return None
+    numpyCorrected = np.array(toConvertNd)
+    variance = np.var(numpyCorrected)
+    return (variance)/(average)
+    
 
 
 ## Two dimensional euclidean distance calculation
@@ -82,8 +115,8 @@ def zoom(my_queue):
     Y = np.array(ys)
     line_fit = LinearRegression().fit(X, Y)
     if(line_fit.score(X, Y) >= coeff_thresh and (dist1 + dist2) > bs_total and dist1 > bs_each and dist2 > bs_each):
-        '''
         print("zoom detected")
+        '''
         print("correlation:" + str(line_fit.score(X, Y)))
         print("distance: " + str(dist1 + dist2))
         print("first_L:" + str(first[0]) + "last_L" + str(last[0]))
@@ -126,26 +159,31 @@ def translate(my_queue):
         return None
     avg_dist_moved = (euclid2Dimension(first[0], last[0]) + euclid2Dimension(first[1], last[1]))/2
     print("Distance Moved" + str(avg_dist_moved))
-    if(avg_dist_moved < min_dist_thresh):
-        print("DNFEFail")
-        return None
     x_t = (((last[0][0] - first[0][0]) + (last[1][0] - first[1][0]))/2) * translation_sensitivity
     y_t = (((last[0][1] - first[0][1]) + (last[1][1] - first[1][1]))/2) * translation_sensitivity
-    return [-x_t, y_t]
+    if(abs(x_t) < min_dist_thresh_x and abs(y_t) < min_dist_thresh_y):
+        print("DNFEFail")
+        return None
+    return [-x_t, (1/0.37)*y_t]
     
 ## return linreg 
 def grabLinReg(my_queue):
     xs = list()
     ys = list()
     q = copy.deepcopy(my_queue)
+    item_count = 0
     while(len(q) != 0):
         points = q.pop()
         for samp in points:
+            item_count += 1
             xs.append([samp[0]])
             ys.append([samp[1]])
-    X = np.array(xs)
-    Y = np.array(ys)
-    line_fit = LinearRegression().fit(X, Y)
-    return line_fit.score(X, Y)
+    if(item_count > 1):
+        X = np.array(xs)
+        Y = np.array(ys)
+        line_fit = LinearRegression().fit(X, Y)
+        return line_fit
+    else:
+        return None
  
     

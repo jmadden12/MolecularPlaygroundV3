@@ -5,9 +5,10 @@ import math
 from collections import deque
 import socket
 
+import draw_utils
 import gesture_utils
 import network_utils
-0
+
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
@@ -15,8 +16,15 @@ mp_hands = mp.solutions.hands
 
 # For webcam input:
 cap = cv2.VideoCapture(0)
-midpoint_q = deque(maxlen=gesture_utils.queue_size)
-midpoint_q.clear()
+
+midpoint_q_zoom = deque(maxlen=gesture_utils.queue_size_zoom)
+midpoint_q_zoom.clear()
+
+midpoint_q_translate = deque(maxlen=gesture_utils.queue_size_translate)
+midpoint_q_translate.clear()
+
+bb_area_q = deque(maxlen=gesture_utils.queue_size_zoom)
+bb_area_q.clear()
 
 
 ##initial molecule state
@@ -53,6 +61,7 @@ with mp_hands.Hands(
           image.flags.writeable = True
           image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
           midpoints = list()
+          hand_areas = list()
           quant = 0
           avg_hz = 0
           avg_vt = 0
@@ -71,6 +80,7 @@ with mp_hands.Hands(
               horizontal_dist = gesture_utils.euclid2Dimension([palm_thumbside.x, palm_thumbside.y], [palm_pinkyside.x, palm_pinkyside.y])
               avg_hz += horizontal_dist
               avg_vt += vertical_dist
+              hand_areas.append(horizontal_dist * vertical_dist) 
               quant += 1
               x = (wrist.x)/horizontal_dist
               y = (wrist.y)/vertical_dist
@@ -83,7 +93,9 @@ with mp_hands.Hands(
                   mp_hands.HAND_CONNECTIONS,
                   mp_drawing_styles.get_default_hand_landmarks_style(),
                   mp_drawing_styles.get_default_hand_connections_style())
-          midpoint_q.append(midpoints)
+          midpoint_q_zoom.append(midpoints)
+          midpoint_q_translate.append(midpoints)
+          bb_area_q.append(hand_areas)
           if(quant > 0):
             avg_hz /= quant
             avg_vt /= quant
@@ -98,26 +110,34 @@ with mp_hands.Hands(
               cv2.line(image, (0, i), (image_width, i), (0, 0, 255), 4)
               i += vertical_draw_dist
 
-
+          '''
           ### TRANSLATION
-          t_vect = gesture_utils.translate(midpoint_q)
+          t_vect = gesture_utils.translate(midpoint_q_translate)
           if(t_vect != None):
             network_utils.send_message(conn, "move", "translate", t_vect)
             print("Translator" + str(t_vect))
           else:
             network_utils.send_message(conn, "move", "translate", [0, 0])
-          #If zoom is detected, clear all data points so that multiple zooms do not occur after first zoom is detected
           '''
-          factor = gesture_utils.zoom(midpoint_q)
-          if(factor != None):
+          ### ZOOM 
+          #If zoom is detected, clear all data points so that multiple zooms do not occur after first zoom is detected
+          factor = gesture_utils.zoom(midpoint_q_zoom)
+          area_variance = gesture_utils.boundingBoxVariance(bb_area_q)
+          if(factor != None and area_variance != None):
               zoom_state += factor
               if(zoom_state < 0):
                 zoom_state = 1
-              network_utils.send_message(conn, "move", "zoom", [zoom_state])
-              midpoint_q.clear()
-          '''
-          if(len(midpoint_q) == midpoint_q.maxlen):
-              midpoint_q.popleft()
+              gesture_utils.printQDesmos(midpoint_q_zoom)
+              print("Variance:" + str(area_variance))
+              midpoint_q_zoom.clear()
+          network_utils.send_message(conn, "move", "zoom", [zoom_state])
+
+
+
+          if(len(midpoint_q_zoom) == midpoint_q_zoom.maxlen):
+              midpoint_q_zoom.popleft()
+          if(len(midpoint_q_translate) == midpoint_q_translate.maxlen):
+              midpoint_q_translate.popleft()
           
           # Flip the image horizontally for a selfie-view display.
           cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))

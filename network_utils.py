@@ -11,6 +11,7 @@ def give_connection():
     conn, addr = s.accept()
     print(addr) 
     return conn
+
 def send_message(conn, type, style, arguments):
     body = {}
     body["type"] = type
@@ -20,6 +21,6 @@ def send_message(conn, type, style, arguments):
     if style == "translate":
         body["x"] = arguments[0]
         body["y"] = arguments[1]
-    print(json.dumps(body))
+    #print(json.dumps(body))
     conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
 
