@@ -27,6 +27,7 @@ bb_area_q = deque(maxlen=gesture_utils.queue_size_zoom)
 bb_area_q.clear()
 
 
+
 ##initial molecule state
 zoom_state = 1
 with mp_hands.Hands(
@@ -65,6 +66,9 @@ with mp_hands.Hands(
           quant = 0
           avg_hz = 0
           avg_vt = 0
+          
+
+          avg_area = gesture_utils.queueAverage(bb_area_q)
           if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
               #for vertical normalization
@@ -80,10 +84,12 @@ with mp_hands.Hands(
               horizontal_dist = gesture_utils.euclid2Dimension([palm_thumbside.x, palm_thumbside.y], [palm_pinkyside.x, palm_pinkyside.y])
               avg_hz += horizontal_dist
               avg_vt += vertical_dist
-              hand_areas.append(horizontal_dist * vertical_dist) 
+
               quant += 1
-              x = (wrist.x)/horizontal_dist
-              y = (wrist.y)/vertical_dist
+
+              x = (wrist.x)/avg_hz
+              y = (wrist.y)/avg_vt
+
 
               midpoints.append([x , y])
 
@@ -110,8 +116,10 @@ with mp_hands.Hands(
               cv2.line(image, (0, i), (image_width, i), (0, 0, 255), 4)
               i += vertical_draw_dist
 
-          '''
+          
+
           ### TRANSLATION
+          '''
           t_vect = gesture_utils.translate(midpoint_q_translate)
           if(t_vect != None):
             network_utils.send_message(conn, "move", "translate", t_vect)
@@ -133,11 +141,12 @@ with mp_hands.Hands(
           network_utils.send_message(conn, "move", "zoom", [zoom_state])
 
 
-
           if(len(midpoint_q_zoom) == midpoint_q_zoom.maxlen):
               midpoint_q_zoom.popleft()
           if(len(midpoint_q_translate) == midpoint_q_translate.maxlen):
               midpoint_q_translate.popleft()
+          if(len(bb_area_q) == bb_area_q.maxlen):
+            bb_area_q.popleft()
           
           # Flip the image horizontally for a selfie-view display.
           cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))

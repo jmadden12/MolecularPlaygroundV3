@@ -18,6 +18,7 @@ missing_data_tolerance = 1
 # Correlation coefficient required for zoom to be performed
 coeff_thresh = 0.87
 
+per_coeff_thresh = 0.95
 
 # Expressed in terms of hand lengths
 bs_total = 1
@@ -73,6 +74,17 @@ def boundingBoxVariance(my_queue):
     numpyCorrected = np.array(toConvertNd)
     variance = np.var(numpyCorrected)
     return (variance)/(average)
+
+def queueAverage(my_queue):
+    q = copy.deepcopy(my_queue)
+    count = 0
+    sum = 0
+    while len(q) > 0:
+        sum += q.pop()
+        count += 1
+    if count == 0:
+        return None
+    return ((sum)/count)
     
 
 
@@ -88,6 +100,7 @@ def zoom(my_queue):
         return None
     xs = list()
     ys = list()
+    each = [[[],[]],[[],[]]]
     last = [[0, 0],[0, 0]]
     first = [[0, 0],[0, 0]]
     while(len(q) != 0):
@@ -100,9 +113,15 @@ def zoom(my_queue):
         # will be the final position of the hands for the possible zoom
         if(len(points) == 2 and np.array_equal(last, [[0, 0],[0, 0]])):
             last = points
+        i = 0
         for samp in points:
+            if(i == 2):
+                break
+            each[i][0].append([samp[0]])
+            each[i][1].append([samp[1]])
             xs.append([samp[0]])
             ys.append([samp[1]])
+            i += 1
     # check if sufficient number of samples due to model losing hands
     # since len(xs) will always be equal to len(ys), we only need to check one
     if(len(xs) < q.maxlen*2 - missing_data_tolerance):
@@ -112,10 +131,21 @@ def zoom(my_queue):
     dist2 = euclid2Dimension(last[1], first[1])
     #re-format array such that 
     X = np.array(xs)
+
     Y = np.array(ys)
+
+    X_0 = np.array(each[0][0])
+    Y_0 = np.array(each[0][1])
+    X_1 = np.array(each[1][0])
+    Y_1 = np.array(each[1][1])
+
     line_fit = LinearRegression().fit(X, Y)
+    line_fit_zero = LinearRegression().fit(X_0, Y_0)
+    line_fit_one = LinearRegression().fit(X_1, Y_1)
     if(line_fit.score(X, Y) >= coeff_thresh and (dist1 + dist2) > bs_total and dist1 > bs_each and dist2 > bs_each):
         print("zoom detected")
+        print("0 score" + str(line_fit_zero.score(X_0, Y_0)))
+        print("1 score" + str(line_fit_one.score(X_1, Y_1)))
         '''
         print("correlation:" + str(line_fit.score(X, Y)))
         print("distance: " + str(dist1 + dist2))
@@ -128,6 +158,7 @@ def zoom(my_queue):
             return -((dist1 + dist2)/zoom_sensitivity)
     else:
         return None
+
 def translate(my_queue):
     q = copy.deepcopy(my_queue)
     if(len(q) != q.maxlen):
