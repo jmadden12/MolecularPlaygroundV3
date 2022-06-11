@@ -9,13 +9,34 @@ import draw_utils
 import gesture_utils
 import network_utils
 
+## MEDIAPIPE INITIALIZATION
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
 
+## DECISION TREE COEFFICIENTS
+## Distances are expressed in terms of hand lengths
+## ALL
+global_dist_threshold = 1
+
+## 1 HAND
+
+## 2 HANDS
+each_hand_dist_thresh = global_dist_threshold * 0.37
+
+zoom_dist_thresh_total = 1
+zoom_dist_thresh_each = 0.5
+
+translate_fl_delta_thresh = 0.8
+
+
+
 
 # For webcam input:
 cap = cv2.VideoCapture(0)
+
+midpoint_q = deque(maxlen=gesture_utils.queue_size)
+midpoint_q.clear()
 
 midpoint_q_zoom = deque(maxlen=gesture_utils.queue_size_zoom)
 midpoint_q_zoom.clear()
@@ -68,7 +89,6 @@ with mp_hands.Hands(
           avg_vt = 0
           
 
-          avg_area = gesture_utils.queueAverage(bb_area_q)
           if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
               #for vertical normalization
@@ -87,9 +107,8 @@ with mp_hands.Hands(
 
               quant += 1
 
-              x = (wrist.x)/avg_hz
-              y = (wrist.y)/avg_vt
-
+              x = (wrist.x)/horizontal_dist
+              y = (wrist.y)/vertical_dist
 
               midpoints.append([x , y])
 
@@ -99,6 +118,7 @@ with mp_hands.Hands(
                   mp_hands.HAND_CONNECTIONS,
                   mp_drawing_styles.get_default_hand_landmarks_style(),
                   mp_drawing_styles.get_default_hand_connections_style())
+          midpoint_q.append(midpoints)
           midpoint_q_zoom.append(midpoints)
           midpoint_q_translate.append(midpoints)
           bb_area_q.append(hand_areas)
@@ -117,6 +137,35 @@ with mp_hands.Hands(
               i += vertical_draw_dist
 
           
+          
+
+          if len(midpoint_q) == midpoint_q.maxlen:
+            ##                   hands in latest frame  hands in newest frame ##
+            hands_detected = min(len(midpoint_q[0]), len(midpoint_q[-1]))
+            if hands_detected == 1:
+              hand0_first_last_dist = gesture_utils.euclid2Dimension(midpoint_q[0][0], midpoint_q[-1][0])
+              if(hand0_first_last_dist > global_dist_threshold):                  
+                ## ROTATE ##
+                print("Rotate")
+            if hands_detected == 2:
+              ## ZOOM OR TRANSLATE ##
+              hand0_first_last_dist = gesture_utils.euclid2Dimension(midpoint_q[0][0], midpoint_q[-1][0])
+              hand1_first_last_dist = gesture_utils.euclid2Dimension(midpoint_q[0][1], midpoint_q[-1][1])
+              if hand0_first_last_dist + hand1_first_last_dist > global_dist_threshold:
+                if hand0_first_last_dist > each_hand_dist_thresh and hand1_first_last_dist > each_hand_dist_thresh:
+
+                  ## Check change in distance between hands, if distance between hands has changed over n frames significantly, is not translate ##
+                  hands_initial_dist = gesture_utils.euclid2Dimension(midpoint_q[0][0], midpoint_q[0][1])
+                  hands_final_dist = gesture_utils.euclid2Dimension(midpoint_q[-1][0], midpoint_q[-1][1])
+                  if abs(hands_final_dist - hands_initial_dist) > translate_fl_delta_thresh:
+                    ## ZOOM ##
+                    gesture_utils.zoom(midpoint_q, hand0_first_last_dist, hand1_first_last_dist, hands_initial_dist, hands_final_dist)
+                  else:
+                    ## TRANSLATE ##
+                    print("Translate")
+
+              
+
 
           ### TRANSLATION
           '''
@@ -129,6 +178,7 @@ with mp_hands.Hands(
           '''
           ### ZOOM 
           #If zoom is detected, clear all data points so that multiple zooms do not occur after first zoom is detected
+          '''
           factor = gesture_utils.zoom(midpoint_q_zoom)
           area_variance = gesture_utils.boundingBoxVariance(bb_area_q)
           if(factor != None and area_variance != None):
@@ -139,8 +189,9 @@ with mp_hands.Hands(
               print("Variance:" + str(area_variance))
               midpoint_q_zoom.clear()
           network_utils.send_message(conn, "move", "zoom", [zoom_state])
-
-
+          '''
+          if(len(midpoint_q) == midpoint_q.maxlen):
+            midpoint_q.popleft()
           if(len(midpoint_q_zoom) == midpoint_q_zoom.maxlen):
               midpoint_q_zoom.popleft()
           if(len(midpoint_q_translate) == midpoint_q_translate.maxlen):

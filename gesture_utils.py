@@ -6,12 +6,14 @@ from sklearn.linear_model import LinearRegression
 from collections import deque
 
 
+queue_size = 7
+
 queue_size_translate = 7
 
-queue_size_zoom = 4
+queue_size_zoom = 12
 
 #tolerable missing data points
-missing_data_tolerance = 1
+missing_data_tolerance = 3
 
 ## ZOOM COEFFICIENTS
 
@@ -20,17 +22,13 @@ coeff_thresh = 0.87
 
 per_coeff_thresh = 0.95
 
-# Expressed in terms of hand lengths
-bs_total = 1
-bs_each = 0.5
-
 #sensitivity coefficients
 zoom_sensitivity = 8.6 # larger -> lower sensitivity
 
 
 ### TRANSLATION COEFFICIENTS
 
-pair_thresh = 0.65
+
 
 min_dist_thresh_x = 1
 
@@ -94,25 +92,11 @@ def euclid2Dimension(a, b):
 
 ## perform linear regression on set of points of hand
 ## fixed length zoom window
-def zoom(my_queue):
-    q = copy.deepcopy(my_queue)
-    if(len(q) != q.maxlen):
-        return None
+def zoom(my_queue, hand0_travel, hand1_travel, hands_i, hands_f):
     xs = list()
     ys = list()
     each = [[[],[]],[[],[]]]
-    last = [[0, 0],[0, 0]]
-    first = [[0, 0],[0, 0]]
-    while(len(q) != 0):
-        points = q.pop()
-        #The earliest starting position of the hands is
-        if(len(points) == 2):
-            first = points
-        # Since the queue has the latest elements at the right side, 
-        # the first item popped (with datapoints from both hands)
-        # will be the final position of the hands for the possible zoom
-        if(len(points) == 2 and np.array_equal(last, [[0, 0],[0, 0]])):
-            last = points
+    for points in my_queue:
         i = 0
         for samp in points:
             if(i == 2):
@@ -122,16 +106,13 @@ def zoom(my_queue):
             xs.append([samp[0]])
             ys.append([samp[1]])
             i += 1
+    
     # check if sufficient number of samples due to model losing hands
     # since len(xs) will always be equal to len(ys), we only need to check one
-    if(len(xs) < q.maxlen*2 - missing_data_tolerance):
+    if(len(xs) < my_queue.maxlen*2 - missing_data_tolerance):
         return None
-    #calculate euclidean distance between final points of hands
-    dist1 = euclid2Dimension(last[0], first[0]) 
-    dist2 = euclid2Dimension(last[1], first[1])
     #re-format array such that 
     X = np.array(xs)
-
     Y = np.array(ys)
 
     X_0 = np.array(each[0][0])
@@ -142,20 +123,14 @@ def zoom(my_queue):
     line_fit = LinearRegression().fit(X, Y)
     line_fit_zero = LinearRegression().fit(X_0, Y_0)
     line_fit_one = LinearRegression().fit(X_1, Y_1)
-    if(line_fit.score(X, Y) >= coeff_thresh and (dist1 + dist2) > bs_total and dist1 > bs_each and dist2 > bs_each):
+    if(line_fit.score(X, Y) >= coeff_thresh):
         print("zoom detected")
         print("0 score" + str(line_fit_zero.score(X_0, Y_0)))
         print("1 score" + str(line_fit_one.score(X_1, Y_1)))
-        '''
-        print("correlation:" + str(line_fit.score(X, Y)))
-        print("distance: " + str(dist1 + dist2))
-        print("first_L:" + str(first[0]) + "last_L" + str(last[0]))
-        print("first_R:" + str(first[1]) + "last_R" + str(last[1]))
-        '''
-        if(euclid2Dimension(last[0], last[1]) > euclid2Dimension(first[0], first[1])):
-            return (dist1 + dist2)/zoom_sensitivity
+        if(hands_f > hands_i):
+            return (hand0_travel + hand1_travel)/zoom_sensitivity
         else:
-            return -((dist1 + dist2)/zoom_sensitivity)
+            return -((hand0_travel+ hand1_travel)/zoom_sensitivity)
     else:
         return None
 
