@@ -51,6 +51,7 @@ bb_area_q.clear()
 
 ##initial molecule state
 zoom_state = 1
+
 with mp_hands.Hands(
     model_complexity=0,
     min_detection_confidence=0.5,
@@ -110,7 +111,7 @@ with mp_hands.Hands(
               x = (wrist.x)/horizontal_dist
               y = (wrist.y)/vertical_dist
 
-              midpoints.append([x , y])
+              midpoints.append([x , (1/0.37)*y])
 
               mp_drawing.draw_landmarks(
                   image,
@@ -138,7 +139,8 @@ with mp_hands.Hands(
 
           
           
-
+          t_vect = [0, 0]
+          r_vect = [0, 0]
           if len(midpoint_q) == midpoint_q.maxlen:
             ##                   hands in latest frame  hands in newest frame ##
             hands_detected = min(len(midpoint_q[0]), len(midpoint_q[-1]))
@@ -146,7 +148,8 @@ with mp_hands.Hands(
               hand0_first_last_dist = gesture_utils.euclid2Dimension(midpoint_q[0][0], midpoint_q[-1][0])
               if(hand0_first_last_dist > global_dist_threshold):                  
                 ## ROTATE ##
-                print("Rotate")
+                r_vect = gesture_utils.rotate(midpoint_q)
+                print(r_vect)
             if hands_detected == 2:
               ## ZOOM OR TRANSLATE ##
               hand0_first_last_dist = gesture_utils.euclid2Dimension(midpoint_q[0][0], midpoint_q[-1][0])
@@ -159,12 +162,19 @@ with mp_hands.Hands(
                   hands_final_dist = gesture_utils.euclid2Dimension(midpoint_q[-1][0], midpoint_q[-1][1])
                   if abs(hands_final_dist - hands_initial_dist) > translate_fl_delta_thresh:
                     ## ZOOM ##
-                    gesture_utils.zoom(midpoint_q, hand0_first_last_dist, hand1_first_last_dist, hands_initial_dist, hands_final_dist)
+                    zoom_delta = gesture_utils.zoom(midpoint_q, hand0_first_last_dist, hand1_first_last_dist, hands_initial_dist, hands_final_dist)
+                    if(zoom_delta != None):
+                      zoom_state += zoom_delta
                   else:
                     ## TRANSLATE ##
+                    t_vect = gesture_utils.translate(midpoint_q)
                     print("Translate")
-
-              
+        
+          network_utils.send_move(conn, "translate", t_vect)
+          network_utils.send_move(conn, "zoom", [zoom_state])
+          network_utils.send_move(conn, "rotate", r_vect)
+          #network_utils.send_sync(conn, "spinXYBy 0 0 0")
+    
 
 
           ### TRANSLATION

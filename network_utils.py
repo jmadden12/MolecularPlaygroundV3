@@ -12,15 +12,23 @@ def give_connection():
     print(addr) 
     return conn
 
-def send_message(conn, type, style, arguments):
+def send_move(conn, style, arguments):
     body = {}
-    body["type"] = type
+    body["type"] = "move"
     body["style"] = style
     if style == "zoom":
         body["scale"] = arguments[0]
     if style == "translate":
         body["x"] = arguments[0]
         body["y"] = arguments[1]
+    if style == "rotate":
+        return send_sync(conn, "rotateXYBy " + str(arguments[0]) + " " + str(arguments[1]))
+    #print(json.dumps(body))
+    conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
+def send_sync(conn, msg):
+    body = {}
+    body["type"] = "sync"
+    body["sync"] = msg
     #print(json.dumps(body))
     conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
 

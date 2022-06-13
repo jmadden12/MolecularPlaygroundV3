@@ -23,7 +23,7 @@ coeff_thresh = 0.87
 per_coeff_thresh = 0.95
 
 #sensitivity coefficients
-zoom_sensitivity = 8.6 # larger -> lower sensitivity
+zoom_sensitivity = 30 # larger -> lower sensitivity
 
 
 ### TRANSLATION COEFFICIENTS
@@ -37,6 +37,8 @@ min_dist_thresh_y = 0.37
 translation_sensitivity = 25 # larger -> higher sensitivity
 
 num_allowed_deviations = 2
+
+rotate_sensitivity = 25
 
 
 
@@ -135,43 +137,15 @@ def zoom(my_queue, hand0_travel, hand1_travel, hands_i, hands_f):
         return None
 
 def translate(my_queue):
-    q = copy.deepcopy(my_queue)
-    if(len(q) != q.maxlen):
-        return None
-    first = q[0]
-    last = q[-1]
-    if(len(first) != 2 or len(last) != 2):
-        print("FLFail")
-        return None
-    starting_distance = euclid2Dimension(first[0], first[1])
-    print("Starting distance:" + str(starting_distance))
-    missing_data = 0
-    deviation_count = 0
-    printQ(q)
-    while(len(q) != 0):
-        data = q.popleft()
-        missing_data +=  2 - len(data)
-        if(len(data) != 2):
-            continue
-        d_dist = euclid2Dimension(data[0], data[1])
-        print("Data distance:" + str(d_dist))
-        if(((d_dist >= (starting_distance - pair_thresh)) and (d_dist <= (starting_distance + pair_thresh))) == False):
-            deviation_count += 1
-    if(deviation_count > num_allowed_deviations):
-        print("HMTFFail")
-        return None
-    if(missing_data > missing_data_tolerance):
-        print("MDTFail")
-        return None
-    avg_dist_moved = (euclid2Dimension(first[0], last[0]) + euclid2Dimension(first[1], last[1]))/2
-    print("Distance Moved" + str(avg_dist_moved))
-    x_t = (((last[0][0] - first[0][0]) + (last[1][0] - first[1][0]))/2) * translation_sensitivity
-    y_t = (((last[0][1] - first[0][1]) + (last[1][1] - first[1][1]))/2) * translation_sensitivity
-    if(abs(x_t) < min_dist_thresh_x and abs(y_t) < min_dist_thresh_y):
-        print("DNFEFail")
-        return None
-    return [-x_t, (1/0.37)*y_t]
-    
+    x_t = (((my_queue[-1][0][0] - my_queue[0][0][0]) + (my_queue[-1][1][0] - my_queue[0][1][0]))/2) * translation_sensitivity
+    y_t = (((my_queue[-1][0][1] - my_queue[0][0][1]) + (my_queue[-1][1][1] - my_queue[0][1][1]))/2) * translation_sensitivity
+    return [-x_t, y_t]
+
+def rotate(my_queue):
+    x_t = (((my_queue[-1][0][0] - my_queue[0][0][0]))/2) * rotate_sensitivity
+    y_t = (((my_queue[-1][0][1] - my_queue[0][0][1]))/2) * rotate_sensitivity
+    return [-x_t, y_t]
+
 ## return linreg 
 def grabLinReg(my_queue):
     xs = list()
