@@ -31,4 +31,6 @@ def send_sync(conn, msg):
     body["sync"] = msg
     #print(json.dumps(body))
     conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
+def send_command(conn, msg):
+    
 

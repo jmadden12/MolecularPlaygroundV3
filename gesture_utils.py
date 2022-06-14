@@ -18,7 +18,7 @@ missing_data_tolerance = 3
 ## ZOOM COEFFICIENTS
 
 # Correlation coefficient required for zoom to be performed
-coeff_thresh = 0.87
+coeff_thresh = 0.84
 
 per_coeff_thresh = 0.95
 
@@ -38,7 +38,7 @@ translation_sensitivity = 25 # larger -> higher sensitivity
 
 num_allowed_deviations = 2
 
-rotate_sensitivity = 25
+rotate_sensitivity = 50
 
 
 
@@ -94,7 +94,7 @@ def euclid2Dimension(a, b):
 
 ## perform linear regression on set of points of hand
 ## fixed length zoom window
-def zoom(my_queue, hand0_travel, hand1_travel, hands_i, hands_f):
+def zoom(my_queue, norm_q, hand0_travel, hand1_travel, hands_i, hands_f):
     xs = list()
     ys = list()
     each = [[[],[]],[[],[]]]
@@ -136,12 +136,12 @@ def zoom(my_queue, hand0_travel, hand1_travel, hands_i, hands_f):
     else:
         return None
 
-def translate(my_queue):
+def translate(my_queue, norm_q):
     x_t = (((my_queue[-1][0][0] - my_queue[0][0][0]) + (my_queue[-1][1][0] - my_queue[0][1][0]))/2) * translation_sensitivity
     y_t = (((my_queue[-1][0][1] - my_queue[0][0][1]) + (my_queue[-1][1][1] - my_queue[0][1][1]))/2) * translation_sensitivity
     return [-x_t, y_t]
 
-def rotate(my_queue):
+def rotate(my_queue, norm_q):
     x_t = (((my_queue[-1][0][0] - my_queue[0][0][0]))/2) * rotate_sensitivity
     y_t = (((my_queue[-1][0][1] - my_queue[0][0][1]))/2) * rotate_sensitivity
     return [-x_t, y_t]
