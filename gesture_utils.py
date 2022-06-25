@@ -18,12 +18,12 @@ missing_data_tolerance = 3
 ## ZOOM COEFFICIENTS
 
 # Correlation coefficient required for zoom to be performed
-coeff_thresh = 0.84
+coeff_thresh = 0.75
 
 per_coeff_thresh = 0.95
 
 #sensitivity coefficients
-zoom_sensitivity = 30 # larger -> lower sensitivity
+zoom_sensitivity = 35 # larger -> lower sensitivity
 
 
 ### TRANSLATION COEFFICIENTS
@@ -34,7 +34,7 @@ min_dist_thresh_x = 1
 
 min_dist_thresh_y = 0.37
 
-translation_sensitivity = 25 # larger -> higher sensitivity
+translation_sensitivity = 3 # larger -> higher sensitivity
 
 num_allowed_deviations = 2
 
@@ -46,7 +46,7 @@ rotate_sensitivity = 50
 def printQ(my_queue):
     q = copy.deepcopy(my_queue)
     while len(q) > 0:
-        print(q.pop())
+        print(q.popleft())
 
 def printQDesmos(my_queue):
     q = copy.deepcopy(my_queue)
@@ -95,10 +95,28 @@ def euclid2Dimension(a, b):
 ## perform linear regression on set of points of hand
 ## fixed length zoom window
 def zoom(my_queue, norm_q, hand0_travel, hand1_travel, hands_i, hands_f):
+    #normalize queue to first detect
+    i = 0
+    q = copy.deepcopy(my_queue)
+    print("q: ")
+    printQ(q)
+    print("norm_q: ")
+    printQ(norm_q)
+    while i < len(q):
+        j = 0
+        while j < len(q[i]) and j < 2:
+            k = 0
+            while k < 2:
+                print("accessing q: " + str(i) + " " + str(k)  + " " + str(j))
+                print("accessing norm_q: 0 " + str(j) + " " + str(k))
+                q[i][j][k] /= norm_q[0][j][k]
+                k += 1
+            j += 1
+        i += 1
     xs = list()
     ys = list()
     each = [[[],[]],[[],[]]]
-    for points in my_queue:
+    for points in q:
         i = 0
         for samp in points:
             if(i == 2):
@@ -111,7 +129,7 @@ def zoom(my_queue, norm_q, hand0_travel, hand1_travel, hands_i, hands_f):
     
     # check if sufficient number of samples due to model losing hands
     # since len(xs) will always be equal to len(ys), we only need to check one
-    if(len(xs) < my_queue.maxlen*2 - missing_data_tolerance):
+    if(len(xs) < q.maxlen*2 - missing_data_tolerance):
         return None
     #re-format array such that 
     X = np.array(xs)
@@ -137,14 +155,18 @@ def zoom(my_queue, norm_q, hand0_travel, hand1_travel, hands_i, hands_f):
         return None
 
 def translate(my_queue, norm_q):
-    x_t = (((my_queue[-1][0][0] - my_queue[0][0][0]) + (my_queue[-1][1][0] - my_queue[0][1][0]))/2) * translation_sensitivity
-    y_t = (((my_queue[-1][0][1] - my_queue[0][0][1]) + (my_queue[-1][1][1] - my_queue[0][1][1]))/2) * translation_sensitivity
+    x_norm_0 = norm_q[0][0][0]
+    x_norm_1 = norm_q[0][1][0]
+    y_norm_0 = norm_q[0][0][1]
+    y_norm_1 = norm_q[0][1][1]
+    x_t = (((my_queue[-1][0][0] - my_queue[0][0][0])/x_norm_0 + (my_queue[-1][1][0] - my_queue[0][1][0])/x_norm_1)/2) * translation_sensitivity
+    y_t = (((my_queue[-1][0][1] - my_queue[0][0][1])/y_norm_0 + (my_queue[-1][1][1] - my_queue[0][1][1])/y_norm_1)/2) * translation_sensitivity
     return [-x_t, y_t]
 
 def rotate(my_queue, norm_q):
     x_t = (((my_queue[-1][0][0] - my_queue[0][0][0]))/2) * rotate_sensitivity
     y_t = (((my_queue[-1][0][1] - my_queue[0][0][1]))/2) * rotate_sensitivity
-    return [-x_t, y_t]
+    return [-x_t*3, y_t]
 
 ## return linreg 
 def grabLinReg(my_queue):

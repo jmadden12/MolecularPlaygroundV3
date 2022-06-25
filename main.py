@@ -55,7 +55,13 @@ bb_area_q.clear()
 
 
 ##initial molecule state
-zoom_state = 1
+zoom_state = 100
+
+translate_state_x = 0
+translate_state_y = 0
+
+zoom_mult = 1
+
 
 with mp_hands.Hands(
     model_complexity=0,
@@ -159,7 +165,9 @@ with mp_hands.Hands(
               hand0_first_last_dist = gesture_utils.euclid2Dimension(norm_initial_0, norm_final_0)
               if(hand0_first_last_dist > global_dist_threshold):                  
                 ## ROTATE ##
+                zoom_mult = 1
                 r_vect = gesture_utils.rotate(midpoint_q, normalization_factors_q)
+                network_utils.send_move(conn, "rotate", r_vect)
                 print(r_vect)
             if hands_detected == 2:
               x_normalization_0 = (normalization_factors_q[0][0][0])
@@ -194,16 +202,29 @@ with mp_hands.Hands(
                     ## ZOOM ##
                     zoom_delta = gesture_utils.zoom(midpoint_q, normalization_factors_q, hand0_first_last_dist, hand1_first_last_dist, hands_initial_dist, hands_final_dist)
                     if(zoom_delta != None):
-                      zoom_state += zoom_delta
+                      zoom_mult += 0.03
+                      zoom_state += (zoom_delta * 100 * zoom_mult)
+                      if(zoom_state < 30):
+                        zoom_state = 30
+                      if(zoom_state > 300):
+                        zoom_state = 300
+                      network_utils.send_move(conn, "zoom", [zoom_state])
+                      network_utils.send_move(conn, "translate", [translate_state_x, translate_state_y])
                   else:
                     ## TRANSLATE ##
+                    zoom_mult = 1
                     t_vect = gesture_utils.translate(midpoint_q, normalization_factors_q)
+                    translate_state_x += t_vect[0]
+                    translate_state_y += t_vect[1]
+                    if(abs(translate_state_x) > 100):
+                      translate_state_x = 0
+                    if(abs(translate_state_y) > 100):
+                      translate_state_y = 0
+                    
+                    network_utils.send_move(conn, "translate", [translate_state_x, translate_state_y])
                     print("Translate")
         
-          network_utils.send_move(conn, "translate", t_vect)
-          network_utils.send_move(conn, "zoom", [zoom_state])
-          network_utils.send_move(conn, "rotate", r_vect)
-          #network_utils.send_sync(conn, "spinXYBy 0 0 0")
+
     
 
 

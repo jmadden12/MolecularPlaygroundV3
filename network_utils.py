@@ -17,12 +17,11 @@ def send_move(conn, style, arguments):
     body["type"] = "move"
     body["style"] = style
     if style == "zoom":
-        body["scale"] = arguments[0]
+        return send_command(conn, "zoom " +  str(arguments[0]))
     if style == "translate":
-        body["x"] = arguments[0]
-        body["y"] = arguments[1]
+        return send_command(conn, "translate x " + str(arguments[0]) + "; translate y " + str(arguments[1]))
     if style == "rotate":
-        return send_sync(conn, "rotateXYBy " + str(arguments[0]) + " " + str(arguments[1]))
+        return send_command(conn, "rotate y " + str(arguments[0]) + "; rotate x " + str(arguments[1]))
     #print(json.dumps(body))
     conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
 def send_sync(conn, msg):
@@ -32,5 +31,10 @@ def send_sync(conn, msg):
     #print(json.dumps(body))
     conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
 def send_command(conn, msg):
+    body = {}
+    body["type"] = "command"
+    body["command"] = msg
+    conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
+
     
 
