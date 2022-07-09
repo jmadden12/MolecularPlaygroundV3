@@ -8,37 +8,26 @@ from collections import deque
 
 queue_size = 7
 
-queue_size_translate = 7
-
-queue_size_zoom = 12
-
 #tolerable missing data points
 missing_data_tolerance = 3
 
-## ZOOM COEFFICIENTS
-
+### ZOOM COEFFICIENTS
 # Correlation coefficient required for zoom to be performed
 coeff_thresh = 0.75
 
-per_coeff_thresh = 0.95
-
-#sensitivity coefficients
 zoom_sensitivity = 35 # larger -> lower sensitivity
 
 
 ### TRANSLATION COEFFICIENTS
-
-
-
 min_dist_thresh_x = 1
 
-min_dist_thresh_y = 0.37
+min_dist_thresh_y = 0.37 # hand is about 0.37 times as wide as it is tall
 
 translation_sensitivity = 3 # larger -> higher sensitivity
 
-num_allowed_deviations = 2
 
-rotate_sensitivity = 50
+### ROTATION COEFFICIENTS
+rotate_sensitivity = 10 #larger -> higher sensitivity
 
 
 
@@ -164,9 +153,11 @@ def translate(my_queue, norm_q):
     return [-x_t, y_t]
 
 def rotate(my_queue, norm_q):
-    x_t = (((my_queue[-1][0][0] - my_queue[0][0][0]))/2) * rotate_sensitivity
-    y_t = (((my_queue[-1][0][1] - my_queue[0][0][1]))/2) * rotate_sensitivity
-    return [-x_t*3, y_t]
+    x_norm_0 = norm_q[0][0][0]
+    y_norm_0 = norm_q[0][0][1]
+    x_t = ((my_queue[-1][0][0] - my_queue[0][0][0])/x_norm_0) * rotate_sensitivity
+    y_t = ((my_queue[-1][0][1] - my_queue[0][0][1])/y_norm_0) * rotate_sensitivity
+    return [-x_t, y_t]
 
 ## return linreg 
 def grabLinReg(my_queue):

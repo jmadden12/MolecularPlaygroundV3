@@ -8,11 +8,19 @@ import socket
 import draw_utils
 import gesture_utils
 import network_utils
+import playlist_utils
 
 ## MEDIAPIPE INITIALIZATION
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
+
+
+
+
+## HAND DETECTION ACTIVE
+hand_detection_active = False
+
 
 ## DECISION TREE COEFFICIENTS
 ## Distances are expressed in terms of hand lengths
@@ -29,9 +37,6 @@ zoom_dist_thresh_each = 0.5
 
 translate_fl_delta_thresh = 0.8
 
-
-
-
 # For webcam input:
 cap = cv2.VideoCapture(0)
 
@@ -41,16 +46,13 @@ midpoint_q.clear()
 normalization_factors_q = deque(maxlen=gesture_utils.queue_size)
 normalization_factors_q.clear()
 
-midpoint_q_zoom = deque(maxlen=gesture_utils.queue_size_zoom)
-midpoint_q_zoom.clear()
 
-midpoint_q_translate = deque(maxlen=gesture_utils.queue_size_translate)
-midpoint_q_translate.clear()
+playlist_utils.cleanup_script_files()
 
-bb_area_q = deque(maxlen=gesture_utils.queue_size_zoom)
-bb_area_q.clear()
+playlist_name = "amino_acids"
 
-
+if(len(playlist_name) > 0):
+  playlist_utils.create_playlist_script_file(playlist_name)
 
 
 
@@ -74,6 +76,8 @@ with mp_hands.Hands(
       s.listen(1)
       conn, addr = s.accept()
       with conn:
+        #network_utils.send_command(conn, "source \"" + playlist_utils.TEMPFILE_DIRECTORY + playlist_name + playlist_utils.SCRIPT_FILE_EXT + "\"")
+        network_utils.send_command(conn, "script genericscript.spt")
         while cap.isOpened():
           success, image = cap.read()
           if not success:
@@ -135,9 +139,6 @@ with mp_hands.Hands(
                   mp_drawing_styles.get_default_hand_connections_style())
           midpoint_q.append(midpoints)
           normalization_factors_q.append(norm_factors)
-          midpoint_q_zoom.append(midpoints)
-          midpoint_q_translate.append(midpoints)
-          bb_area_q.append(hand_areas)
           if(quant > 0):
             avg_hz /= quant
             avg_vt /= quant
@@ -153,115 +154,85 @@ with mp_hands.Hands(
               i += vertical_draw_dist
 
           
-          
-          t_vect = [0, 0]
-          r_vect = [0, 0]
-          if len(midpoint_q) == midpoint_q.maxlen:
-            ##                   hands in latest frame  hands in newest frame ##
-            hands_detected = min(len(midpoint_q[0]), len(midpoint_q[-1]))
-            if hands_detected == 1:
-              norm_initial_0 = [midpoint_q[0][0][0]/normalization_factors_q[0][0][0], midpoint_q[0][0][1]/normalization_factors_q[0][0][1]]
-              norm_final_0 = [midpoint_q[-1][0][0]/normalization_factors_q[0][0][0], midpoint_q[-1][0][1]/normalization_factors_q[0][0][1]]
-              hand0_first_last_dist = gesture_utils.euclid2Dimension(norm_initial_0, norm_final_0)
-              if(hand0_first_last_dist > global_dist_threshold):                  
-                ## ROTATE ##
-                zoom_mult = 1
-                r_vect = gesture_utils.rotate(midpoint_q, normalization_factors_q)
-                network_utils.send_move(conn, "rotate", r_vect)
-                print(r_vect)
-            if hands_detected == 2:
-              x_normalization_0 = (normalization_factors_q[0][0][0])
-              y_normalization_0 = (normalization_factors_q[0][0][1])
+          if(hand_detection_active):
+            t_vect = [0, 0]
+            r_vect = [0, 0]
+            if len(midpoint_q) == midpoint_q.maxlen:
+              ##                   hands in latest frame  hands in newest frame ##
+              hands_detected = min(len(midpoint_q[0]), len(midpoint_q[-1]))
+              if hands_detected == 1:
+                norm_initial_0 = [midpoint_q[0][0][0]/normalization_factors_q[0][0][0], midpoint_q[0][0][1]/normalization_factors_q[0][0][1]]
+                norm_final_0 = [midpoint_q[-1][0][0]/normalization_factors_q[0][0][0], midpoint_q[-1][0][1]/normalization_factors_q[0][0][1]]
+                hand0_first_last_dist = gesture_utils.euclid2Dimension(norm_initial_0, norm_final_0)
+                if(hand0_first_last_dist > global_dist_threshold):                  
+                  ## ROTATE ##
+                  zoom_mult = 1
+                  r_vect = gesture_utils.rotate(midpoint_q, normalization_factors_q)
+                  network_utils.send_move(conn, "rotate", r_vect)
+                  print(r_vect)
+              if hands_detected == 2:
+                x_normalization_0 = (normalization_factors_q[0][0][0])
+                y_normalization_0 = (normalization_factors_q[0][0][1])
 
-              x_normalization_1 = (normalization_factors_q[0][1][0])
-              y_normalization_1 = (normalization_factors_q[0][1][1])
-              
-              norm_initial_0_0 = [midpoint_q[0][0][0]/x_normalization_0, midpoint_q[0][0][1]/y_normalization_0]
-              norm_final_0_0 = [midpoint_q[-1][0][0]/x_normalization_0, midpoint_q[-1][0][1]/y_normalization_0]
-              
-              norm_initial_1_0 = [midpoint_q[0][1][0]/x_normalization_1, midpoint_q[0][1][1]/y_normalization_1]
-              norm_final_1_0 = [midpoint_q[-1][1][0]/x_normalization_1, midpoint_q[-1][1][1]/y_normalization_1]
+                x_normalization_1 = (normalization_factors_q[0][1][0])
+                y_normalization_1 = (normalization_factors_q[0][1][1])
+                
+                norm_initial_0_0 = [midpoint_q[0][0][0]/x_normalization_0, midpoint_q[0][0][1]/y_normalization_0]
+                norm_final_0_0 = [midpoint_q[-1][0][0]/x_normalization_0, midpoint_q[-1][0][1]/y_normalization_0]
+                
+                norm_initial_1_0 = [midpoint_q[0][1][0]/x_normalization_1, midpoint_q[0][1][1]/y_normalization_1]
+                norm_final_1_0 = [midpoint_q[-1][1][0]/x_normalization_1, midpoint_q[-1][1][1]/y_normalization_1]
 
-              ## ZOOM OR TRANSLATE ##
-              hand0_first_last_dist = gesture_utils.euclid2Dimension(norm_initial_0_0, norm_final_0_0)
-              hand1_first_last_dist = gesture_utils.euclid2Dimension(norm_initial_1_0, norm_final_1_0)
-              if hand0_first_last_dist + hand1_first_last_dist > global_dist_threshold:
-                if hand0_first_last_dist > each_hand_dist_thresh and hand1_first_last_dist > each_hand_dist_thresh:
-                  ## Check change in distance between hands, if distance between hands has changed over n frames significantly, is not translate ##
-                  avg_x_norm = (x_normalization_0 + x_normalization_1)/2
-                  avg_y_norm = (y_normalization_0 + y_normalization_1)/2
+                ## ZOOM OR TRANSLATE ##
+                hand0_first_last_dist = gesture_utils.euclid2Dimension(norm_initial_0_0, norm_final_0_0)
+                hand1_first_last_dist = gesture_utils.euclid2Dimension(norm_initial_1_0, norm_final_1_0)
+                if hand0_first_last_dist + hand1_first_last_dist > global_dist_threshold:
+                  if hand0_first_last_dist > each_hand_dist_thresh and hand1_first_last_dist > each_hand_dist_thresh:
+                    ## Check change in distance between hands, if distance between hands has changed over n frames significantly, is not translate ##
+                    avg_x_norm = (x_normalization_0 + x_normalization_1)/2
+                    avg_y_norm = (y_normalization_0 + y_normalization_1)/2
 
-                  norm_initial_0_1 = [midpoint_q[0][0][0]/avg_x_norm, midpoint_q[0][0][1]/avg_y_norm]
-                  norm_final_0_1 = [midpoint_q[-1][0][0]/avg_x_norm, midpoint_q[-1][0][1]/avg_y_norm]
-                  
-                  norm_initial_1_1 = [midpoint_q[0][1][0]/avg_x_norm, midpoint_q[0][1][1]/avg_y_norm]
-                  norm_final_1_1 = [midpoint_q[-1][1][0]/avg_x_norm, midpoint_q[-1][1][1]/avg_y_norm]
-                  hands_initial_dist = gesture_utils.euclid2Dimension(norm_initial_0_1, norm_initial_1_1)
-                  hands_final_dist = gesture_utils.euclid2Dimension(norm_final_0_1, norm_final_1_1)
-                  if abs(hands_final_dist - hands_initial_dist) > translate_fl_delta_thresh:
-                    ## ZOOM ##
-                    zoom_delta = gesture_utils.zoom(midpoint_q, normalization_factors_q, hand0_first_last_dist, hand1_first_last_dist, hands_initial_dist, hands_final_dist)
-                    if(zoom_delta != None):
-                      zoom_mult += 0.03
-                      zoom_state += (zoom_delta * 100 * zoom_mult)
-                      if(zoom_state < 30):
-                        zoom_state = 30
-                      if(zoom_state > 300):
-                        zoom_state = 300
-                      network_utils.send_move(conn, "zoom", [zoom_state])
-                      network_utils.send_move(conn, "translate", [translate_state_x, translate_state_y])
-                  else:
-                    ## TRANSLATE ##
-                    zoom_mult = 1
-                    t_vect = gesture_utils.translate(midpoint_q, normalization_factors_q)
-                    translate_state_x += t_vect[0]
-                    translate_state_y += t_vect[1]
-                    if(abs(translate_state_x) > 100):
-                      translate_state_x = 0
-                    if(abs(translate_state_y) > 100):
-                      translate_state_y = 0
+                    norm_initial_0_1 = [midpoint_q[0][0][0]/avg_x_norm, midpoint_q[0][0][1]/avg_y_norm]
+                    norm_final_0_1 = [midpoint_q[-1][0][0]/avg_x_norm, midpoint_q[-1][0][1]/avg_y_norm]
                     
-                    network_utils.send_move(conn, "translate", [translate_state_x, translate_state_y])
-                    print("Translate")
-        
-
-    
-
-
-          ### TRANSLATION
-          '''
-          t_vect = gesture_utils.translate(midpoint_q_translate)
-          if(t_vect != None):
-            network_utils.send_message(conn, "move", "translate", t_vect)
-            print("Translator" + str(t_vect))
-          else:
-            network_utils.send_message(conn, "move", "translate", [0, 0])
-          '''
-          ### ZOOM 
-          #If zoom is detected, clear all data points so that multiple zooms do not occur after first zoom is detected
-          '''
-          factor = gesture_utils.zoom(midpoint_q_zoom)
-          area_variance = gesture_utils.boundingBoxVariance(bb_area_q)
-          if(factor != None and area_variance != None):
-              zoom_state += factor
-              if(zoom_state < 0):
-                zoom_state = 1
-              gesture_utils.printQDesmos(midpoint_q_zoom)
-              print("Variance:" + str(area_variance))
-              midpoint_q_zoom.clear()
-          network_utils.send_message(conn, "move", "zoom", [zoom_state])
-          '''
+                    norm_initial_1_1 = [midpoint_q[0][1][0]/avg_x_norm, midpoint_q[0][1][1]/avg_y_norm]
+                    norm_final_1_1 = [midpoint_q[-1][1][0]/avg_x_norm, midpoint_q[-1][1][1]/avg_y_norm]
+                    hands_initial_dist = gesture_utils.euclid2Dimension(norm_initial_0_1, norm_initial_1_1)
+                    hands_final_dist = gesture_utils.euclid2Dimension(norm_final_0_1, norm_final_1_1)
+                    if abs(hands_final_dist - hands_initial_dist) > translate_fl_delta_thresh:
+                      ## ZOOM ##
+                      zoom_delta = gesture_utils.zoom(midpoint_q, normalization_factors_q, hand0_first_last_dist, hand1_first_last_dist, hands_initial_dist, hands_final_dist)
+                      if(zoom_delta != None):
+                        zoom_mult += 0.03
+                        zoom_state += (zoom_delta * 100 * zoom_mult)
+                        if(zoom_state < 30):
+                          zoom_state = 30
+                        if(zoom_state > 300):
+                          zoom_state = 300
+                        network_utils.send_move(conn, "zoom", [zoom_state])
+                        network_utils.send_move(conn, "translate", [translate_state_x, translate_state_y])
+                    else:
+                      ## TRANSLATE ##
+                      zoom_mult = 1
+                      t_vect = gesture_utils.translate(midpoint_q, normalization_factors_q)
+                      translate_state_x += t_vect[0]
+                      translate_state_y += t_vect[1]
+                      if(abs(translate_state_x) > 100):
+                        translate_state_x = 0
+                      if(abs(translate_state_y) > 100):
+                        translate_state_y = 0
+                      
+                      network_utils.send_move(conn, "translate", [translate_state_x, translate_state_y])
+                      print("Translate")
+      
           if(len(midpoint_q) == midpoint_q.maxlen):
             midpoint_q.popleft()
-          if(len(midpoint_q_zoom) == midpoint_q_zoom.maxlen):
-              midpoint_q_zoom.popleft()
-          if(len(midpoint_q_translate) == midpoint_q_translate.maxlen):
-              midpoint_q_translate.popleft()
-          if(len(bb_area_q) == bb_area_q.maxlen):
-            bb_area_q.popleft()
+          if(len(normalization_factors_q) == normalization_factors_q.maxlen):
+            normalization_factors_q.popleft()
           
           # Flip the image horizontally for a selfie-view display.
           cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))
           if cv2.waitKey(5) & 0xFF == 27:
             break
 cap.release()
+playlist_utils.cleanup_script_files()
