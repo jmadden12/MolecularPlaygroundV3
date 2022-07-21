@@ -2,18 +2,41 @@ from distutils.log import error
 import os
 import zipfile
 
+
+RELATIVE_PATH = "/Users/localadmin/MolecularPlayground2022/MolecularPlaygroundV3/"
+
 ASSET_FILE_EXT = ".pdb"
 
 SCRIPT_FILE_EXT = ".spt"
 
 PLAYLIST_FILE_EXT = ".playlist"
 
-PLAYLIST_DIRECTORY = "playlists/"
+PLAYLIST_DIRECTORY = RELATIVE_PATH + "playlists/"
 
-TEMPFILE_DIRECTORY = "temp/"
+TEMPFILE_DIRECTORY = RELATIVE_PATH + "temp/"
 
-ZIPFILE_DIRECTORY = "zips/"
+ZIPFILE_DIRECTORY = RELATIVE_PATH + "zips/"
 
+
+def listof_valid_playlists():
+    valid_playlists = []
+    with os.scandir(PLAYLIST_DIRECTORY) as it:
+        for entry in it:
+            if(entry.is_dir()):
+                if(construct_script_string(entry.name) != -1):
+                    valid_playlists.append(entry.name)
+    return valid_playlists
+
+def playlist_file_to_list(playlist_name):
+    pl_filename = PLAYLIST_DIRECTORY + playlist_name + "/" + playlist_name + ".playlist"
+    
+    if(os.path.exists(pl_filename) == False):
+        return -1
+    fd = open(pl_filename)
+    entry_list = []
+    while((line := fd.readline().rstrip()) != ""):
+        entry_list.append(line)
+    return entry_list
 
 def construct_script_string(playlist_name):
     path = PLAYLIST_DIRECTORY + playlist_name + "/"
@@ -31,7 +54,6 @@ def construct_script_string(playlist_name):
     
     playlist_file = open(path + playlist_filename, 'r')
     script_string = ""
-
     for line in playlist_file:
         line = line.rstrip()
         error_string = ""
@@ -47,6 +69,7 @@ def construct_script_string(playlist_name):
         
         script_string += "load " + path + asset_filename + "\n"
         script_string += "script " + path + script_filename + "\n"
+    script_string += "loop on\n"
     return script_string
 
 def create_playlist_script_file(playlist_name):

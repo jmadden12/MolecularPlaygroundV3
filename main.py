@@ -4,11 +4,116 @@ import mediapipe as mp
 import math
 from collections import deque
 import socket
+import shutil
+import os
+import time
 
 import draw_utils
 import gesture_utils
 import network_utils
 import playlist_utils
+
+### TKINTER ###
+import tkinter as tk
+from tkinter import ttk
+from tkinter import filedialog
+# root window
+
+current_playlist = "valid_playlist"
+
+root = tk.Tk()
+root.geometry('400x300')
+root.title("Molecular Playground")
+
+SP_LISTBOX_HEIGHT = 5
+
+valid_lists = playlist_utils.listof_valid_playlists()
+listbox_var = tk.StringVar(value=valid_lists)
+
+playlist_utils.cleanup_script_files()
+for playlist in valid_lists:
+  playlist_utils.create_playlist_script_file(playlist)
+
+def return_zipfile_from_dialog():
+    global valid_lists
+    global listbox_var
+    zipfile_filename = filedialog.askopenfilename(filetypes=[("Playlist zip file", "*.zip")], title="Import Playlist .zip", initialdir="~/")
+    print("Name:")
+    print(zipfile_filename)
+    if(len(zipfile_filename) > 0):
+      shutil.copy2(zipfile_filename, playlist_utils.ZIPFILE_DIRECTORY)
+      pl_name = os.path.splitext(os.path.basename(zipfile_filename))[0]
+      if(playlist_utils.is_pl_zip_valid(pl_name)):
+        playlist_utils.import_playlist_zip(pl_name)
+        playlist_utils.create_playlist_script_file(pl_name)
+        valid_lists.append(pl_name)
+        listbox_var.set(valid_lists)
+    return zipfile_filename
+
+def update_playlist():
+  global conn
+  global current_playlist
+  global listbox_select_playlist
+  global valid_lists
+  print(listbox_select_playlist.get(listbox_select_playlist.curselection()))
+  selected = listbox_select_playlist.get(listbox_select_playlist.curselection())
+  current_playlist = selected
+  network_utils.send_command(conn, "!quit")
+  network_utils.send_command(conn, "script " + playlist_utils.TEMPFILE_DIRECTORY + current_playlist + playlist_utils.SCRIPT_FILE_EXT)
+  
+
+
+
+# create a notebook
+notebook = ttk.Notebook(root)
+notebook.pack(pady=10, expand=True)
+
+tab_names = ["Playlists", "Networking", "Debug"]
+
+PLAYLISTS_TAB = 0
+NETWORKING_TAB = 1
+DEBUG_TAB = 2
+
+tab_frames = []
+
+for i in range(len(tab_names)):
+    tab_frames.append(ttk.Frame(notebook, width=400, height=280))
+    tab_frames[i].pack(fill='both', expand=True)
+    notebook.add(tab_frames[i], text=tab_names[i])
+
+##PLAYLIST TAB
+## PLAYLIST TAB DATA INITIALIZATION
+
+
+button_import_zipfile = ttk.Button(tab_frames[PLAYLISTS_TAB], text="Import Playlist (*.zip)", command=return_zipfile_from_dialog)
+button_import_zipfile.pack(pady=30)
+
+listbox_select_playlist = tk.Listbox(tab_frames[PLAYLISTS_TAB], listvariable=listbox_var, height=SP_LISTBOX_HEIGHT)
+listbox_select_playlist.pack()
+
+button_update_playlist = ttk.Button(tab_frames[PLAYLISTS_TAB], text="Update Playlist", command=update_playlist)
+button_update_playlist.pack(pady=10)
+
+root.update()
+root.update_idletasks()
+
+### /TKINTER ###
+
+## INACTIVITY MANAGER
+
+MAX_INACTIVITY = 5
+
+last_action = time.time()
+
+MOVIE_MODE = 0
+USER_MODE = 1
+
+current_mode = MOVIE_MODE
+
+save_state_name = "savestate"
+
+RESTORE_TIME = 3
+
 
 ## MEDIAPIPE INITIALIZATION
 mp_drawing = mp.solutions.drawing_utils
@@ -19,7 +124,7 @@ mp_hands = mp.solutions.hands
 
 
 ## HAND DETECTION ACTIVE
-hand_detection_active = False
+hand_detection_active = True
 
 
 ## DECISION TREE COEFFICIENTS
@@ -47,7 +152,6 @@ normalization_factors_q = deque(maxlen=gesture_utils.queue_size)
 normalization_factors_q.clear()
 
 
-playlist_utils.cleanup_script_files()
 
 playlist_name = "amino_acids"
 
@@ -76,8 +180,8 @@ with mp_hands.Hands(
       s.listen(1)
       conn, addr = s.accept()
       with conn:
+        network_utils.send_command(conn, "set debugHigh ON")
         #network_utils.send_command(conn, "source \"" + playlist_utils.TEMPFILE_DIRECTORY + playlist_name + playlist_utils.SCRIPT_FILE_EXT + "\"")
-        network_utils.send_command(conn, "script genericscript.spt")
         while cap.isOpened():
           success, image = cap.read()
           if not success:
@@ -164,7 +268,14 @@ with mp_hands.Hands(
                 norm_initial_0 = [midpoint_q[0][0][0]/normalization_factors_q[0][0][0], midpoint_q[0][0][1]/normalization_factors_q[0][0][1]]
                 norm_final_0 = [midpoint_q[-1][0][0]/normalization_factors_q[0][0][0], midpoint_q[-1][0][1]/normalization_factors_q[0][0][1]]
                 hand0_first_last_dist = gesture_utils.euclid2Dimension(norm_initial_0, norm_final_0)
-                if(hand0_first_last_dist > global_dist_threshold):                  
+                if(hand0_first_last_dist > global_dist_threshold):
+                  ## INACTIVITY BLOCK ##
+                  if(current_mode == MOVIE_MODE):
+                    current_mode = USER_MODE
+                    network_utils.send_command(conn, "!throw context usermode")
+                    network_utils.send_command(conn, "!save orientation " + save_state_name)
+                  last_action = time.time()                  
+                  
                   ## ROTATE ##
                   zoom_mult = 1
                   r_vect = gesture_utils.rotate(midpoint_q, normalization_factors_q)
@@ -203,6 +314,13 @@ with mp_hands.Hands(
                       ## ZOOM ##
                       zoom_delta = gesture_utils.zoom(midpoint_q, normalization_factors_q, hand0_first_last_dist, hand1_first_last_dist, hands_initial_dist, hands_final_dist)
                       if(zoom_delta != None):
+                        ## INACTIVITY BLOCK ##
+                        if(current_mode == MOVIE_MODE):
+                          current_mode = USER_MODE
+                          network_utils.send_command(conn, "!throw context usermode")
+                          network_utils.send_command(conn, "!save orientation " + save_state_name)
+                        last_action = time.time()     
+                        
                         zoom_mult += 0.03
                         zoom_state += (zoom_delta * 100 * zoom_mult)
                         if(zoom_state < 30):
@@ -213,6 +331,14 @@ with mp_hands.Hands(
                         network_utils.send_move(conn, "translate", [translate_state_x, translate_state_y])
                     else:
                       ## TRANSLATE ##
+
+                      ## INACTIVITY BLOCK ##
+                      if(current_mode == MOVIE_MODE):
+                        current_mode = USER_MODE
+                        network_utils.send_command(conn, "!throw context usermode")
+                        network_utils.send_command(conn, "!save orientation " + save_state_name)
+                      last_action = time.time()
+
                       zoom_mult = 1
                       t_vect = gesture_utils.translate(midpoint_q, normalization_factors_q)
                       translate_state_x += t_vect[0]
@@ -224,11 +350,21 @@ with mp_hands.Hands(
                       
                       network_utils.send_move(conn, "translate", [translate_state_x, translate_state_y])
                       print("Translate")
-      
+          if(time.time() - last_action > MAX_INACTIVITY and current_mode == USER_MODE):
+            current_mode = MOVIE_MODE
+            network_utils.send_command(conn, "!restore orientation " + save_state_name + " " + str(RESTORE_TIME))
+            network_utils.send_command(conn, "!&usermode")
+          if(current_mode == 0):
+            print("MOVIE_MODE")
+          else:
+            print("USER_MODE")
           if(len(midpoint_q) == midpoint_q.maxlen):
             midpoint_q.popleft()
           if(len(normalization_factors_q) == normalization_factors_q.maxlen):
             normalization_factors_q.popleft()
+          
+          root.update_idletasks()
+          root.update()
           
           # Flip the image horizontally for a selfie-view display.
           cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))
