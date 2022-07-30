@@ -272,8 +272,8 @@ with mp_hands.Hands(
                   ## INACTIVITY BLOCK ##
                   if(current_mode == MOVIE_MODE):
                     current_mode = USER_MODE
-                    network_utils.send_command(conn, "!throw context usermode")
-                    network_utils.send_command(conn, "!save orientation " + save_state_name)
+                    network_utils.send_command(conn, "!write state " + save_state_name + ";!save state " + save_state_name)
+                    network_utils.send_command(conn, "!quit")
                   last_action = time.time()                  
                   
                   ## ROTATE ##
@@ -317,8 +317,8 @@ with mp_hands.Hands(
                         ## INACTIVITY BLOCK ##
                         if(current_mode == MOVIE_MODE):
                           current_mode = USER_MODE
-                          network_utils.send_command(conn, "!throw context usermode")
-                          network_utils.send_command(conn, "!save orientation " + save_state_name)
+                          network_utils.send_command(conn, "!write state " + save_state_name + ";!save state " + save_state_name)
+                          network_utils.send_command(conn, "!quit")
                         last_action = time.time()     
                         
                         zoom_mult += 0.03
@@ -335,8 +335,8 @@ with mp_hands.Hands(
                       ## INACTIVITY BLOCK ##
                       if(current_mode == MOVIE_MODE):
                         current_mode = USER_MODE
-                        network_utils.send_command(conn, "!throw context usermode")
-                        network_utils.send_command(conn, "!save orientation " + save_state_name)
+                        network_utils.send_command(conn, "!write state " + save_state_name + ";!save state " + save_state_name)
+                        network_utils.send_command(conn, "!quit")
                       last_action = time.time()
 
                       zoom_mult = 1
@@ -352,8 +352,7 @@ with mp_hands.Hands(
                       print("Translate")
           if(time.time() - last_action > MAX_INACTIVITY and current_mode == USER_MODE):
             current_mode = MOVIE_MODE
-            network_utils.send_command(conn, "!restore orientation " + save_state_name + " " + str(RESTORE_TIME))
-            network_utils.send_command(conn, "!&usermode")
+            network_utils.send_command(conn, "restore state " + save_state_name)
           if(current_mode == 0):
             print("MOVIE_MODE")
           else:
