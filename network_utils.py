@@ -24,6 +24,33 @@ def send_move(conn, style, arguments):
         return send_command(conn, "rotate y " + str(arguments[0]) + "; rotate x " + str(arguments[1]))
     #print(json.dumps(body))
     conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
+def send_move_2(conn, style, arguments):
+    body = {}
+    body["type"] = "move"
+    body["style"] = style
+    if style == "zoom":
+        body["scale"] = arguments[0]
+    if style == "translate":
+        body["x"] = arguments[0]
+        body["y"] = arguments[1]
+    if style == "rotate":
+        body["x"] = arguments[0]
+        body["y"] = arguments[1]
+    #print(json.dumps(body))
+    conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
+
+def send_set_variable(conn, var, data):
+    body = {}
+    body["var"] = var
+    body["data"] = data
+    body["type"] = "command"
+    body["command"] = ""
+    conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
+def send_content(conn, id):
+    body = {}
+    body["type"] = "content"
+    body["id"] = id
+    conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
 def send_sync(conn, msg):
     body = {}
     body["type"] = "sync"

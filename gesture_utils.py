@@ -27,7 +27,7 @@ translation_sensitivity = 3 # larger -> higher sensitivity
 
 
 ### ROTATION COEFFICIENTS
-rotate_sensitivity = 10 #larger -> higher sensitivity
+rotate_sensitivity = 3.5 #larger -> higher sensitivity
 
 
 
@@ -87,17 +87,11 @@ def zoom(my_queue, norm_q, hand0_travel, hand1_travel, hands_i, hands_f):
     #normalize queue to first detect
     i = 0
     q = copy.deepcopy(my_queue)
-    print("q: ")
-    printQ(q)
-    print("norm_q: ")
-    printQ(norm_q)
     while i < len(q):
         j = 0
         while j < len(q[i]) and j < 2:
             k = 0
             while k < 2:
-                print("accessing q: " + str(i) + " " + str(k)  + " " + str(j))
-                print("accessing norm_q: 0 " + str(j) + " " + str(k))
                 q[i][j][k] /= norm_q[0][j][k]
                 k += 1
             j += 1

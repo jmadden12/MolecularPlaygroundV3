@@ -80,6 +80,16 @@ def create_playlist_script_file(playlist_name):
         return -1
     tempfile.write(script_string)
 
+def create_playlist_json_file(playlist_name):
+    tempfile = open(TEMPFILE_DIRECTORY + playlist_name + ".json", 'w')
+    if(playlist_name == -1):
+        tempfile.close()
+        return -1
+    json_string = "{\"startup_script\" : \"" + TEMPFILE_DIRECTORY + playlist_name + SCRIPT_FILE_EXT + "\" , \"banner_text\" : \"" + playlist_name + "\"}\n"
+    print(json_string)
+    tempfile.write(json_string)
+    
+
 def cleanup_script_files():
     with os.scandir(TEMPFILE_DIRECTORY) as it:
         for entry in it:
