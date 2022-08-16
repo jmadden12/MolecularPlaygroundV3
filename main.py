@@ -1,3 +1,4 @@
+
 import cv2
 import datetime
 import mediapipe as mp
@@ -7,11 +8,14 @@ import socket
 import shutil
 import os
 import time
+import threading
 
 import draw_utils
 import gesture_utils
 import network_utils
 import playlist_utils
+
+conn=None
 
 ### TKINTER ###
 import tkinter as tk
@@ -33,7 +37,6 @@ listbox_var = tk.StringVar(value=valid_lists)
 playlist_utils.cleanup_script_files()
 for playlist in valid_lists:
   playlist_utils.create_playlist_script_file(playlist)
-  playlist_utils.create_playlist_json_file(playlist)
 
 def return_zipfile_from_dialog():
     global valid_lists
@@ -59,7 +62,8 @@ def update_playlist():
   print(listbox_select_playlist.get(listbox_select_playlist.curselection()))
   selected = listbox_select_playlist.get(listbox_select_playlist.curselection())
   current_playlist = selected
-  network_utils.send_content(conn, current_playlist)
+  network_utils.send_command(conn, "!quit")
+  network_utils.send_command(conn, "script " + playlist_utils.TEMPFILE_DIRECTORY + current_playlist + playlist_utils.SCRIPT_FILE_EXT)
   
 
 
@@ -86,6 +90,7 @@ for i in range(len(tab_names)):
 
 
 button_import_zipfile = ttk.Button(tab_frames[PLAYLISTS_TAB], text="Import Playlist (*.zip)", command=return_zipfile_from_dialog)
+
 button_import_zipfile.pack(pady=30)
 
 listbox_select_playlist = tk.Listbox(tab_frames[PLAYLISTS_TAB], listvariable=listbox_var, height=SP_LISTBOX_HEIGHT)
@@ -153,12 +158,6 @@ normalization_factors_q.clear()
 
 
 
-playlist_name = "amino_acids"
-
-if(len(playlist_name) > 0):
-  playlist_utils.create_playlist_script_file(playlist_name)
-
-
 
 ##initial molecule state
 zoom_state = 100
@@ -168,6 +167,11 @@ translate_state_y = 0
 
 zoom_mult = 1
 
+def listening_for_conn(s):
+    global conn
+    #s.setblocking(0)
+    s.listen(1)
+    conn, addr = s.accept()
 
 with mp_hands.Hands(
     model_complexity=0,
@@ -177,14 +181,16 @@ with mp_hands.Hands(
     with socket.socket() as s: 
       s.bind((network_utils.HOST, network_utils.PORT))
       print('Waiting for connection on Host: %s, Port: %s'%(network_utils.HOST, network_utils.PORT))
-      s.listen(1)
-      conn, addr = s.accept()
+      threading.Thread(target=listening_for_conn, args=(s,)).start()
+      while(True):
+        if conn==None:
+          root.update()
+          root.update_idletasks()
+        else:
+          break
+        time.sleep(0.01)
       with conn:
-        # MPJmol Config
         network_utils.send_command(conn, "set debugHigh ON")
-        network_utils.send_set_variable(conn, "niocontentpath", playlist_utils.TEMPFILE_DIRECTORY + "%ID%.json")
-        network_utils.send_set_variable(conn, "niomotiondisabled", False)
-        network_utils.send_set_variable(conn, "niocontentdisabled", False)
         #network_utils.send_command(conn, "source \"" + playlist_utils.TEMPFILE_DIRECTORY + playlist_name + playlist_utils.SCRIPT_FILE_EXT + "\"")
         while cap.isOpened():
           success, image = cap.read()
@@ -272,12 +278,19 @@ with mp_hands.Hands(
                 norm_initial_0 = [midpoint_q[0][0][0]/normalization_factors_q[0][0][0], midpoint_q[0][0][1]/normalization_factors_q[0][0][1]]
                 norm_final_0 = [midpoint_q[-1][0][0]/normalization_factors_q[0][0][0], midpoint_q[-1][0][1]/normalization_factors_q[0][0][1]]
                 hand0_first_last_dist = gesture_utils.euclid2Dimension(norm_initial_0, norm_final_0)
-                if(hand0_first_last_dist > global_dist_threshold):        
+                if(hand0_first_last_dist > global_dist_threshold):
+                  ## INACTIVITY BLOCK ##
+                  if(current_mode == MOVIE_MODE):
+                    current_mode = USER_MODE
+                    network_utils.send_command(conn, "!throw context usermode")
+                    network_utils.send_command(conn, "!save orientation " + save_state_name)
+                  last_action = time.time()                  
+                  
                   ## ROTATE ##
                   zoom_mult = 1
                   r_vect = gesture_utils.rotate(midpoint_q, normalization_factors_q)
-                  network_utils.send_move_2(conn, "rotate", r_vect)
-                  print("Rotate")
+                  network_utils.send_move(conn, "rotate", r_vect)
+                  print(r_vect)
               if hands_detected == 2:
                 x_normalization_0 = (normalization_factors_q[0][0][0])
                 y_normalization_0 = (normalization_factors_q[0][0][1])
@@ -312,6 +325,11 @@ with mp_hands.Hands(
                       zoom_delta = gesture_utils.zoom(midpoint_q, normalization_factors_q, hand0_first_last_dist, hand1_first_last_dist, hands_initial_dist, hands_final_dist)
                       if(zoom_delta != None):
                         ## INACTIVITY BLOCK ##
+                        if(current_mode == MOVIE_MODE):
+                          current_mode = USER_MODE
+                          network_utils.send_command(conn, "!throw context usermode")
+                          network_utils.send_command(conn, "!save orientation " + save_state_name)
+                        last_action = time.time()     
                         
                         zoom_mult += 0.03
                         zoom_state += (zoom_delta * 100 * zoom_mult)
@@ -319,15 +337,17 @@ with mp_hands.Hands(
                           zoom_state = 30
                         if(zoom_state > 300):
                           zoom_state = 300
-
-                        
-                        network_utils.send_move_2(conn, "zoom", [zoom_state])
-                        #network_utils.send_move_2(conn, "translate", [translate_state_x, translate_state_y])
-                        print("Zoom")
+                        network_utils.send_move(conn, "zoom", [zoom_state])
+                        network_utils.send_move(conn, "translate", [translate_state_x, translate_state_y])
                     else:
                       ## TRANSLATE ##
 
                       ## INACTIVITY BLOCK ##
+                      if(current_mode == MOVIE_MODE):
+                        current_mode = USER_MODE
+                        network_utils.send_command(conn, "!throw context usermode")
+                        network_utils.send_command(conn, "!save orientation " + save_state_name)
+                      last_action = time.time()
 
                       zoom_mult = 1
                       t_vect = gesture_utils.translate(midpoint_q, normalization_factors_q)
@@ -338,9 +358,16 @@ with mp_hands.Hands(
                       if(abs(translate_state_y) > 100):
                         translate_state_y = 0
                       
-                      network_utils.send_move_2(conn, "translate", [translate_state_x, translate_state_y])
+                      network_utils.send_move(conn, "translate", [translate_state_x, translate_state_y])
                       print("Translate")
-
+          if(time.time() - last_action > MAX_INACTIVITY and current_mode == USER_MODE):
+            current_mode = MOVIE_MODE
+            network_utils.send_command(conn, "!restore orientation " + save_state_name + " " + str(RESTORE_TIME))
+            network_utils.send_command(conn, "!&usermode")
+          if(current_mode == 0):
+            print("MOVIE_MODE")
+          else:
+            print("USER_MODE")
           if(len(midpoint_q) == midpoint_q.maxlen):
             midpoint_q.popleft()
           if(len(normalization_factors_q) == normalization_factors_q.maxlen):
@@ -350,7 +377,7 @@ with mp_hands.Hands(
           root.update()
           
           # Flip the image horizontally for a selfie-view display.
-          #cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))
+          cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))
           if cv2.waitKey(5) & 0xFF == 27:
             break
 cap.release()
