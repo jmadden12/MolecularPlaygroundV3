@@ -114,6 +114,10 @@ save_state_name = "savestate"
 
 RESTORE_TIME = 3
 
+##ROTATE
+
+rotate_hitstun = 0
+
 
 ## MEDIAPIPE INITIALIZATION
 mp_drawing = mp.solutions.drawing_utils
@@ -274,6 +278,9 @@ with mp_hands.Hands(
                 hand0_first_last_dist = gesture_utils.euclid2Dimension(norm_initial_0, norm_final_0)
                 if(hand0_first_last_dist > global_dist_threshold):        
                   ## ROTATE ##
+                  if(rotate_hitstun > 0):
+                    rotate_hitstun -= 1
+                    continue
                   zoom_mult = 1
                   r_vect = gesture_utils.rotate(midpoint_q, normalization_factors_q)
                   network_utils.send_move_2(conn, "rotate", r_vect)
@@ -312,7 +319,7 @@ with mp_hands.Hands(
                       zoom_delta = gesture_utils.zoom(midpoint_q, normalization_factors_q, hand0_first_last_dist, hand1_first_last_dist, hands_initial_dist, hands_final_dist)
                       if(zoom_delta != None):
                         ## INACTIVITY BLOCK ##
-                        
+                        rotate_hitstun = gesture_utils.block_rotate
                         zoom_mult += 0.03
                         zoom_state += (zoom_delta * 100 * zoom_mult)
                         if(zoom_state < 30):
@@ -337,8 +344,9 @@ with mp_hands.Hands(
                         translate_state_x = 0
                       if(abs(translate_state_y) > 100):
                         translate_state_y = 0
-                      
-                      network_utils.send_move_2(conn, "translate", [translate_state_x, translate_state_y])
+                      print("Translate state X: " + str(translate_state_x))
+                      print("Translate state Y: " + str(translate_state_y))
+                      network_utils.send_move_2(conn, "translate", [t_vect[0], t_vect[1]])
                       print("Translate")
 
           if(len(midpoint_q) == midpoint_q.maxlen):

@@ -36,7 +36,7 @@ def send_move_2(conn, style, arguments):
     if style == "rotate":
         body["x"] = arguments[0]
         body["y"] = arguments[1]
-    #print(json.dumps(body))
+    print(json.dumps(body))
     conn.sendall(bytes(json.dumps(body) + '\n', 'utf-8'))
 
 def send_set_variable(conn, var, data):

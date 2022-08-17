@@ -17,13 +17,14 @@ coeff_thresh = 0.75
 
 zoom_sensitivity = 35 # larger -> lower sensitivity
 
+block_rotate = 5
 
 ### TRANSLATION COEFFICIENTS
 min_dist_thresh_x = 1
 
 min_dist_thresh_y = 0.37 # hand is about 0.37 times as wide as it is tall
 
-translation_sensitivity = 3 # larger -> higher sensitivity
+translation_sensitivity = 12 # larger -> higher sensitivity
 
 
 ### ROTATION COEFFICIENTS
@@ -127,9 +128,6 @@ def zoom(my_queue, norm_q, hand0_travel, hand1_travel, hands_i, hands_f):
     line_fit_zero = LinearRegression().fit(X_0, Y_0)
     line_fit_one = LinearRegression().fit(X_1, Y_1)
     if(line_fit.score(X, Y) >= coeff_thresh):
-        print("zoom detected")
-        print("0 score" + str(line_fit_zero.score(X_0, Y_0)))
-        print("1 score" + str(line_fit_one.score(X_1, Y_1)))
         if(hands_f > hands_i):
             return (hand0_travel + hand1_travel)/zoom_sensitivity
         else:
