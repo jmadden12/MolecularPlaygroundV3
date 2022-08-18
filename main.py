@@ -27,7 +27,7 @@ root.title("Molecular Playground")
 
 SP_LISTBOX_HEIGHT = 5
 
-valid_lists = playlist_utils.listof_valid_playlists()
+valid_lists = playlist_utils.list_of_playlists()
 listbox_var = tk.StringVar(value=valid_lists)
 
 playlist_utils.cleanup_script_files()
@@ -35,21 +35,20 @@ for playlist in valid_lists:
   playlist_utils.create_playlist_script_file(playlist)
   playlist_utils.create_playlist_json_file(playlist)
 
-def return_zipfile_from_dialog():
+def return_playlist_from_dialog():
     global valid_lists
     global listbox_var
-    zipfile_filename = filedialog.askopenfilename(filetypes=[("Playlist zip file", "*.zip")], title="Import Playlist .zip", initialdir="~/")
+    playlist_filename = filedialog.askopenfilename(filetypes=[("playlist file", "*" + playlist_utils.PLAYLIST_FILE_EXT)], title="Import Playlist File", initialdir="~/")
     print("Name:")
-    print(zipfile_filename)
-    if(len(zipfile_filename) > 0):
-      shutil.copy2(zipfile_filename, playlist_utils.ZIPFILE_DIRECTORY)
-      pl_name = os.path.splitext(os.path.basename(zipfile_filename))[0]
-      if(playlist_utils.is_pl_zip_valid(pl_name)):
-        playlist_utils.import_playlist_zip(pl_name)
-        playlist_utils.create_playlist_script_file(pl_name)
-        valid_lists.append(pl_name)
-        listbox_var.set(valid_lists)
-    return zipfile_filename
+    print(playlist_filename)
+    if(len(playlist_filename) > 0):
+      shutil.copy2(playlist_filename, playlist_utils.PLAYLIST_DIRECTORY)
+      pl_name = os.path.splitext(os.path.basename(playlist_filename))[0]
+      playlist_utils.create_playlist_script_file(pl_name)
+      playlist_utils.create_playlist_json_file
+      valid_lists.append(pl_name)
+      listbox_var.set(valid_lists)
+    return playlist_filename
 
 def update_playlist():
   global conn
@@ -85,7 +84,7 @@ for i in range(len(tab_names)):
 ## PLAYLIST TAB DATA INITIALIZATION
 
 
-button_import_zipfile = ttk.Button(tab_frames[PLAYLISTS_TAB], text="Import Playlist (*.zip)", command=return_zipfile_from_dialog)
+button_import_zipfile = ttk.Button(tab_frames[PLAYLISTS_TAB], text="Import Playlist (*" + playlist_utils.PLAYLIST_FILE_EXT + ")", command=return_playlist_from_dialog)
 button_import_zipfile.pack(pady=30)
 
 listbox_select_playlist = tk.Listbox(tab_frames[PLAYLISTS_TAB], listvariable=listbox_var, height=SP_LISTBOX_HEIGHT)
@@ -157,10 +156,7 @@ normalization_factors_q.clear()
 
 
 
-playlist_name = "amino_acids"
 
-if(len(playlist_name) > 0):
-  playlist_utils.create_playlist_script_file(playlist_name)
 
 
 

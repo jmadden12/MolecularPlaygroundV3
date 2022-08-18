@@ -10,7 +10,7 @@ ASSET_FILE_EXT = [".pdb"]
 
 SCRIPT_FILE_EXT = ".spt"
 
-PLAYLIST_FILE_EXT = ".playlist"
+PLAYLIST_FILE_EXT = ".txt"
 
 PLAYLIST_DIRECTORY = RELATIVE_PATH + "playlists/"
 
@@ -62,7 +62,7 @@ def generate_playlist_script_string(playlist_name):
     
 
 def playlist_file_to_list(playlist_name):
-    pl_filename = PLAYLIST_DIRECTORY + playlist_name + ".playlist"
+    pl_filename = PLAYLIST_DIRECTORY + playlist_name + PLAYLIST_FILE_EXT
     if(os.path.exists(pl_filename) == False):
         return -1
     fd = open(pl_filename)
